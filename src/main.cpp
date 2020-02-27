@@ -1,8 +1,12 @@
 #include <Arduino.h>
+#include <ESP8266WiFi.h>
+#include <PubSubClient.h>
 #include <SoftwareSerial.h>
 
 #include <dsmr.h>
 #include "reader2.h"
+// Remove all traces of secrets before publishing to github!
+#include "secrests.h"
 
 using P1Data = ParsedData<
   /* String */ identification,
@@ -42,6 +46,12 @@ using P1Data = ParsedData<
   /* TimestampedFixedValue */ gas_delivered
 >;
 
+
+const auto server_ip = IPAddress(192, 168, 2, 8);
+WiFiClient wifi_client;
+PubSubClient client(server_ip, 1883, wifi_client);
+const char* client_id = "dsmr-esp";
+
 /**
  * This illustrates looping over all parsed fields using the
  * ParsedData::applyEach method.
@@ -65,11 +75,19 @@ struct Printer {
   template<typename Item>
   void apply(Item &i) {
     if (i.present()) {
-      Serial.print(Item::name);
-      Serial.print(F(": "));
-      Serial.print(i.val());
-      Serial.print(Item::unit());
-      Serial.println();
+      String data;
+      data += i.val();
+      data += Item::unit();
+      //Serial.println(data);
+      // This is probably an expensive operation.
+      // Find out if this can be improved.
+      client.publish((String("sensor/dsmr/dsmr-esp/status/") + Item::name).c_str(), data.c_str());
+
+      //Serial.print(Item::name);
+      //Serial.print(F(": "));
+      //Serial.print(i.val());
+      //Serial.print(Item::unit());
+      //Serial.println();
     }
   }
 };
@@ -84,13 +102,50 @@ void setup(){
   // one telegram is ~822 chars long, so 1024 as buffer size should be ok
   p1meter.begin(115200, SWSERIAL_8N1, D2, -1, true, 1024);
   Serial.begin(115200);
-  Serial.println("Smart meter reader v0.1.0, by Rick van Schijndel");
+  Serial.println("Smart meter reader v0.2.0, by Rick van Schijndel");
+  Serial.printf("Connecting to %s ", ssid);
+  WiFi.begin(ssid, pass);
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println(" connected");
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+}
+
+void reconnect() {
+  // backoff
+  unsigned retry = 0;
+  // Loop until we're reconnected
+  while (!client.connected()) {
+    Serial.print("Attempting MQTT connection...");
+    // Attempt to connect
+    if (client.connect(client_id, username, password)) {
+      Serial.println("mqtt connected");
+    } else {
+      Serial.print("mqtt: failed to connect, rc=");
+      Serial.print(client.state());
+      // First retry every 5 seconds, but back off to once every 30 seconds after retrying a couple of times.
+      unsigned retry_time_s = retry < 5 ? 5 : 30;
+      Serial.printf(" retrying in %u seconds\n", retry_time_s);
+      // Wait n seconds before retrying
+      delay(retry_time_s * 1000);
+      retry++;
+    }
+  }
 }
 
 unsigned successful = 0;
 unsigned failed = 0;
 
 void loop() {
+  if (!client.connected()) {
+    reconnect();
+  }
+  client.loop();
+
   if (p1meter.available()) {
     digitalWrite(LED_BUILTIN, LOW);
     p1reader.loop();
