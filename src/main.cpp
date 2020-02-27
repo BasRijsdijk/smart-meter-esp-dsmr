@@ -6,7 +6,7 @@
 #include <dsmr.h>
 #include "reader2.h"
 // Remove all traces of secrets before publishing to github!
-#include "secrests.h"
+#include "secrets.h"
 
 using P1Data = ParsedData<
   /* String */ identification,
@@ -75,19 +75,12 @@ struct Printer {
   template<typename Item>
   void apply(Item &i) {
     if (i.present()) {
-      String data;
-      data += i.val();
-      data += Item::unit();
       //Serial.println(data);
       // This is probably an expensive operation.
       // Find out if this can be improved.
-      client.publish((String("sensor/dsmr/dsmr-esp/status/") + Item::name).c_str(), data.c_str());
-
-      //Serial.print(Item::name);
-      //Serial.print(F(": "));
-      //Serial.print(i.val());
-      //Serial.print(Item::unit());
-      //Serial.println();
+      String topic = String("sensor/dsmr/dsmr-esp/status/") + Item::name + "_" + Item::unit();
+      String value = String(i.val());
+      client.publish(topic.c_str(), value.c_str());
     }
   }
 };
@@ -140,6 +133,15 @@ void reconnect() {
 unsigned successful = 0;
 unsigned failed = 0;
 
+const char* success_topic = "sensor/dsmr/dsmr-esp/status/decode_success";
+const char* failure_topic = "sensor/dsmr/dsmr-esp/status/decode_failure";
+
+void publish(const char* topic, unsigned value) {
+    char buffer[(sizeof(int)*8+1)];
+    snprintf(buffer, sizeof(buffer), "%u", value);
+    client.publish(topic, buffer);
+}
+
 void loop() {
   if (!client.connected()) {
     reconnect();
@@ -167,6 +169,8 @@ void loop() {
     Serial.print(successful);
     Serial.print(" failed: ");
     Serial.println(failed);
+    publish(success_topic, successful);
+    publish(failure_topic, failed);
   }
 }
 
