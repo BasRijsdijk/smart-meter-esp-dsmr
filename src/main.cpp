@@ -131,6 +131,28 @@ void setup(){
   setLed(false);
 }
 
+const char* success_topic = "sensor/dsmr/dsmr-esp/status/decode_success";
+const char* failure_topic = "sensor/dsmr/dsmr-esp/status/decode_failure";
+const char* heap_before_topic = "sensor/dsmr/dsmr-esp/status/free_heap_before";
+const char* heap_after_topic = "sensor/dsmr/dsmr-esp/status/free_heap_after";
+const char* parse_time_topic = "sensor/dsmr/dsmr-esp/status/parse_time";
+const char* error_topic = "sensor/dsmr/dsmr-esp/status/error";
+const char* reconnect_topic = "sensor/dsmr/dsmr-esp/status/reconnect_count";
+
+void publish(const char* topic, unsigned value) {
+    char buffer[(sizeof(value)*8+1)];
+    snprintf(buffer, sizeof(buffer), "%u", value);
+    client.publish(topic, buffer);
+}
+
+void publish(const char* topic, unsigned long value) {
+    char buffer[(sizeof(value)*8+1)];
+    snprintf(buffer, sizeof(buffer), "%lu", value);
+    client.publish(topic, buffer);
+}
+
+unsigned reconnects = 0;
+
 void reconnect() {
   // backoff
   unsigned retry = 0;
@@ -141,6 +163,8 @@ void reconnect() {
     // Attempt to connect
     if (client.connect(client_id, username, password)) {
       Serial.println("mqtt connected");
+      reconnects++;
+      publish(reconnect_topic, reconnects);
     } else {
       Serial.print("mqtt: failed to connect, rc=");
       Serial.print(client.state());
@@ -156,25 +180,6 @@ void reconnect() {
 
 unsigned successful = 0;
 unsigned failed = 0;
-
-const char* success_topic = "sensor/dsmr/dsmr-esp/status/decode_success";
-const char* failure_topic = "sensor/dsmr/dsmr-esp/status/decode_failure";
-const char* heap_before_topic = "sensor/dsmr/dsmr-esp/status/free_heap_before";
-const char* heap_after_topic = "sensor/dsmr/dsmr-esp/status/free_heap_after";
-const char* error_topic = "sensor/dsmr/dsmr-esp/status/error";
-
-void publish(const char* topic, unsigned value) {
-    char buffer[(sizeof(value)*8+1)];
-    snprintf(buffer, sizeof(buffer), "%u", value);
-    client.publish(topic, buffer);
-}
-
-void publish(const char* topic, unsigned long value) {
-    char buffer[(sizeof(value)*8+1)];
-    snprintf(buffer, sizeof(buffer), "%lu", value);
-    client.publish(topic, buffer);
-}
-
 unsigned passed_loops = 0;
 void led_flicker(const unsigned loops) {
   if ((++passed_loops % loops) == 0) {
@@ -196,6 +201,7 @@ void loop() {
   }
 
   if (p1reader.available()) {
+    auto start_time = millis();
     publish(heap_before_topic, ESP.getFreeHeap());
     setLed(true);
     Serial.println("Data available");
@@ -216,6 +222,8 @@ void loop() {
     publish(success_topic, successful);
     publish(failure_topic, failed);
     publish(heap_after_topic, ESP.getFreeHeap());
+    auto end_time = millis();
+    publish(parse_time_topic, end_time - start_time);
     setLed(false);
   }
 
