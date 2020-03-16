@@ -126,7 +126,7 @@ struct ParseResult : public _ParseResult<ParseResult<T>, T> {
     return *this;
   }
   ParseResult() = default;
-  ParseResult(const ParseResult& other) = default;
+  ParseResult(const ParseResult&) = default;
 
   template <typename T2>
   ParseResult(const ParseResult<T2>& other): next(other.next), err(other.err), ctx(other.ctx) { }
