@@ -115,7 +115,7 @@ void setup(){
   setLed(true);
   // RX = D2
   // one telegram is ~822 chars long, so 1024 as buffer size should be ok
-  p1meter.begin(115200, SWSERIAL_8N1, D2, -1, true, 1024);
+  p1meter.begin(115200, SWSERIAL_8N1, D2, -1, true, 850);
   Serial.begin(115200);
   Serial.println("\nSmart meter reader v0.3.0, by Rick van Schijndel");
   Serial.printf("Connecting to %s ", ssid);
