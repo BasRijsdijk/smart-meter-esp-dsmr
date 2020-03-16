@@ -138,6 +138,7 @@ const char* heap_after_topic = "sensor/dsmr/dsmr-esp/status/free_heap_after";
 const char* parse_time_topic = "sensor/dsmr/dsmr-esp/status/parse_time";
 const char* error_topic = "sensor/dsmr/dsmr-esp/status/error";
 const char* reconnect_topic = "sensor/dsmr/dsmr-esp/status/reconnect_count";
+const char* publish_time_topic = "sensor/dsmr/dsmr-esp/status/time_after_prev_msg";
 
 void publish(const char* topic, unsigned value) {
     char buffer[(sizeof(value)*8+1)];
@@ -190,6 +191,8 @@ void led_flicker(const unsigned loops) {
   }
 }
 
+unsigned publish_time = 0;
+
 void loop() {
   if (!client.connected()) {
     reconnect();
@@ -225,6 +228,10 @@ void loop() {
     auto end_time = millis();
     publish(parse_time_topic, end_time - start_time);
     setLed(false);
+    if (publish_time != 0) {
+      publish(publish_time_topic, millis() - publish_time);
+    }
+    publish_time = millis();
   }
 
   //led_flicker(100000);
