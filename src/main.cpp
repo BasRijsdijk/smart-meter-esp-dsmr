@@ -117,7 +117,7 @@ void setup(){
   // one telegram is ~822 chars long, so 1024 as buffer size should be ok
   p1meter.begin(115200, SWSERIAL_8N1, D2, -1, true, 850);
   Serial.begin(115200);
-  Serial.println("\nSmart meter reader v0.3.0, by Rick van Schijndel");
+  Serial.println("\nSmart meter reader v0.4.0, by Rick van Schijndel");
   Serial.printf("Connecting to %s ", ssid);
   WiFi.begin(ssid, pass);
   while (WiFi.status() != WL_CONNECTED)
