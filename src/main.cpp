@@ -4,7 +4,7 @@
 #include <SoftwareSerial.h>
 
 #include <dsmr.h>
-#include "reader2.h"
+
 // Remove all traces of secrets before publishing to github!
 #include "secrets.h"
 
@@ -78,15 +78,16 @@ struct Printer {
       //Serial.println(data);
       // This is probably an expensive operation.
       // Find out if this can be improved.
-      String topic = String("sensor/dsmr/dsmr-esp/status/") + Item::name + "_" + Item::unit();
+      String topic = String("sensor/dsmr/dsmr-esp/status/") + Item::name + String("_") + Item::unit();
       String value = String(i.val());
       client.publish(topic.c_str(), value.c_str());
+      client.loop();
     }
   }
 };
 
 SoftwareSerial p1meter;
-P1Reader2 p1reader(&p1meter);
+P1Reader p1reader(&p1meter);
 
 void setup(){
   pinMode(LED_BUILTIN, OUTPUT);
@@ -112,6 +113,7 @@ void reconnect() {
   // backoff
   unsigned retry = 0;
   // Loop until we're reconnected
+
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
     // Attempt to connect
@@ -137,11 +139,16 @@ const char* success_topic = "sensor/dsmr/dsmr-esp/status/decode_success";
 const char* failure_topic = "sensor/dsmr/dsmr-esp/status/decode_failure";
 
 void publish(const char* topic, unsigned value) {
-    char buffer[(sizeof(int)*8+1)];
+    char buffer[(sizeof(unsigned)*8+1)];
     snprintf(buffer, sizeof(buffer), "%u", value);
     client.publish(topic, buffer);
 }
 
+void publish(const char* topic, unsigned long value) {
+    char buffer[(sizeof(unsigned long)*8+1)];
+    snprintf(buffer, sizeof(buffer), "%lu", value);
+    client.publish(topic, buffer);
+}
 void loop() {
   if (!client.connected()) {
     reconnect();

@@ -29,8 +29,8 @@
  * from a serial port and parsing it.
  */
 
-#ifndef DSMR_INCLUDE_READER2_H
-#define DSMR_INCLUDE_READER2_H
+#ifndef DSMR_INCLUDE_READER_H
+#define DSMR_INCLUDE_READER_H
 
 //#include <Arduino.h>
 //#include "crc16.h"
@@ -53,13 +53,13 @@ namespace dsmr {
  * partial message is discarded. Any bytes received while disabled are
  * dropped.
  */
-class P1Reader2 {
+class P1Reader {
   public:
     /**
      * Create a new P1Reader. The stream passed should be the serial
      * port to which the P1 TX pin is connected.
      */
-    P1Reader2(Stream *stream)
+    P1Reader(Stream *stream)
       : stream(stream), state(State::WAITING_STATE) {
     }
 
@@ -207,5 +207,5 @@ class P1Reader2 {
 
 } // namespace dsmr
 
-#endif // DSMR_INCLUDE_READER2_H
+#endif // DSMR_INCLUDE_READER_H
 
