@@ -3,6 +3,8 @@
 #include <PubSubClient.h>
 #include <SoftwareSerial.h>
 
+#include <type_traits>
+
 #include <dsmr.h>
 
 // Remove all traces of secrets before publishing to github!
@@ -52,6 +54,20 @@ WiFiClient wifi_client;
 PubSubClient client(server_ip, 1883, wifi_client);
 const char* client_id = "dsmr-esp";
 
+namespace converthelper {
+
+template <typename ValueT>
+String toString(ValueT value) {
+  return String(value);
+}
+
+template <>
+String toString(float value) {
+  return String(value, 3);
+}
+
+}
+
 /**
  * This illustrates looping over all parsed fields using the
  * ParsedData::applyEach method.
@@ -79,24 +95,29 @@ struct Printer {
       // This is probably an expensive operation.
       // Find out if this can be improved.
       String topic = String("sensor/dsmr/dsmr-esp/status/") + Item::name + String("_") + Item::unit();
-      String value = String(i.val());
+      String value = converthelper::toString(i.val());
       client.publish(topic.c_str(), value.c_str());
       client.loop();
     }
   }
 };
 
+void setLed(bool enable) {
+  // Needs inverted signal
+  digitalWrite(LED_BUILTIN, !enable);
+}
+
 SoftwareSerial p1meter;
 P1Reader p1reader(&p1meter);
 
 void setup(){
   pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, LOW);
+  setLed(true);
   // RX = D2
   // one telegram is ~822 chars long, so 1024 as buffer size should be ok
   p1meter.begin(115200, SWSERIAL_8N1, D2, -1, true, 1024);
   Serial.begin(115200);
-  Serial.println("Smart meter reader v0.2.0, by Rick van Schijndel");
+  Serial.println("\nSmart meter reader v0.3.0, by Rick van Schijndel");
   Serial.printf("Connecting to %s ", ssid);
   WiFi.begin(ssid, pass);
   while (WiFi.status() != WL_CONNECTED)
@@ -107,6 +128,7 @@ void setup(){
   Serial.println(" connected");
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
+  setLed(false);
 }
 
 void reconnect() {
@@ -137,18 +159,32 @@ unsigned failed = 0;
 
 const char* success_topic = "sensor/dsmr/dsmr-esp/status/decode_success";
 const char* failure_topic = "sensor/dsmr/dsmr-esp/status/decode_failure";
+const char* heap_before_topic = "sensor/dsmr/dsmr-esp/status/free_heap_before";
+const char* heap_after_topic = "sensor/dsmr/dsmr-esp/status/free_heap_after";
+const char* error_topic = "sensor/dsmr/dsmr-esp/status/error";
 
 void publish(const char* topic, unsigned value) {
-    char buffer[(sizeof(unsigned)*8+1)];
+    char buffer[(sizeof(value)*8+1)];
     snprintf(buffer, sizeof(buffer), "%u", value);
     client.publish(topic, buffer);
 }
 
 void publish(const char* topic, unsigned long value) {
-    char buffer[(sizeof(unsigned long)*8+1)];
+    char buffer[(sizeof(value)*8+1)];
     snprintf(buffer, sizeof(buffer), "%lu", value);
     client.publish(topic, buffer);
 }
+
+unsigned passed_loops = 0;
+void led_flicker(const unsigned loops) {
+  if ((++passed_loops % loops) == 0) {
+    setLed(true);
+  }
+  if ((passed_loops % loops) == 500) {
+    setLed(false);
+  }
+}
+
 void loop() {
   if (!client.connected()) {
     reconnect();
@@ -156,12 +192,12 @@ void loop() {
   client.loop();
 
   if (p1meter.available()) {
-    digitalWrite(LED_BUILTIN, LOW);
     p1reader.loop();
-  } else {
-    digitalWrite(LED_BUILTIN, HIGH);
   }
+
   if (p1reader.available()) {
+    publish(heap_before_topic, ESP.getFreeHeap());
+    setLed(true);
     Serial.println("Data available");
     P1Data data;
     String err;
@@ -171,6 +207,7 @@ void loop() {
     } else {
       failed += 1;
       Serial.println(err);
+      client.publish(error_topic, err.c_str());
     }
     Serial.print("Successful: ");
     Serial.print(successful);
@@ -178,6 +215,10 @@ void loop() {
     Serial.println(failed);
     publish(success_topic, successful);
     publish(failure_topic, failed);
+    publish(heap_after_topic, ESP.getFreeHeap());
+    setLed(false);
   }
+
+  //led_flicker(100000);
 }
 
