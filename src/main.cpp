@@ -97,7 +97,7 @@ struct Printer {
       String topic = String("sensor/dsmr/dsmr-esp/status/") + Item::name + String("_") + Item::unit();
       String value = converthelper::toString(i.val());
       client.publish(topic.c_str(), value.c_str());
-      client.loop();
+      //client.loop();
     }
   }
 };
