@@ -89,15 +89,14 @@ String toString(float value) {
  */
 struct Printer {
   template<typename Item>
-  void apply(Item &i) {
-    if (i.present()) {
+  void apply(Item &item) {
+    if (item.present()) {
       //Serial.println(data);
       // This is probably an expensive operation.
       // Find out if this can be improved.
       String topic = String("sensor/dsmr/dsmr-esp/status/") + Item::name + String("_") + Item::unit();
-      String value = converthelper::toString(i.val());
+      String value = converthelper::toString(item.val());
       client.publish(topic.c_str(), value.c_str());
-      //client.loop();
     }
   }
 };
@@ -115,9 +114,10 @@ void setup(){
   setLed(true);
   // RX = D2
   // one telegram is ~822 chars long, so 1024 as buffer size should be ok
-  p1meter.begin(115200, SWSERIAL_8N1, D2, -1, true, 850);
+  p1meter.begin(115200, SWSERIAL_8N1, D2, -1, true, 1024);
+  p1meter.enableTx(false);
   Serial.begin(115200);
-  Serial.println("\nSmart meter reader v0.4.0, by Rick van Schijndel");
+  Serial.println("\nSmart meter reader v0.5.0, by Rick van Schijndel");
   Serial.printf("Connecting to %s ", ssid);
   WiFi.begin(ssid, pass);
   while (WiFi.status() != WL_CONNECTED)
