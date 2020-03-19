@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
-#include <SoftwareSerial.h>
 
 #include <type_traits>
 
@@ -56,14 +55,17 @@ const char* client_id = "dsmr-esp";
 
 namespace converthelper {
 
+
 template <typename ValueT>
 String toString(ValueT value) {
+  static_assert(!std::is_same<decltype(value), FixedValue>::value, "is fixed value");
+  static_assert(!std::is_same<decltype(value), float>::value, "is float");
   return String(value);
 }
 
 template <>
-String toString(float value) {
-  return String(value, 3);
+String toString(FixedValue value) {
+  return String(value.val(), 3);
 }
 
 }
@@ -91,7 +93,6 @@ struct Printer {
   template<typename Item>
   void apply(Item &item) {
     if (item.present()) {
-      //Serial.println(data);
       // This is probably an expensive operation.
       // Find out if this can be improved.
       String topic = String("sensor/dsmr/dsmr-esp/status/") + Item::name + String("_") + Item::unit();
@@ -106,28 +107,18 @@ void setLed(bool enable) {
   digitalWrite(LED_BUILTIN, !enable);
 }
 
-SoftwareSerial p1meter;
-P1Reader p1reader(&p1meter);
+P1Reader p1reader(&Serial);
 
 void setup(){
   pinMode(LED_BUILTIN, OUTPUT);
   setLed(true);
-  // RX = D2
-  // one telegram is ~822 chars long, so 1024 as buffer size should be ok
-  p1meter.begin(115200, SWSERIAL_8N1, D2, -1, true, 1024);
-  p1meter.enableTx(false);
-  Serial.begin(115200);
-  Serial.println("\nSmart meter reader v0.5.0, by Rick van Schijndel");
-  Serial.printf("Connecting to %s ", ssid);
+  // Using default serial for reception
+  Serial.begin(115200, SERIAL_8N1, SERIAL_RX_ONLY, 1, true);
   WiFi.begin(ssid, pass);
   while (WiFi.status() != WL_CONNECTED)
   {
     delay(500);
-    Serial.print(".");
   }
-  Serial.println(" connected");
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
   setLed(false);
 }
 
@@ -160,18 +151,13 @@ void reconnect() {
   // Loop until we're reconnected
 
   while (!client.connected()) {
-    Serial.print("Attempting MQTT connection...");
     // Attempt to connect
     if (client.connect(client_id, username, password)) {
-      Serial.println("mqtt connected");
       reconnects++;
       publish(reconnect_topic, reconnects);
     } else {
-      Serial.print("mqtt: failed to connect, rc=");
-      Serial.print(client.state());
       // First retry every 5 seconds, but back off to once every 30 seconds after retrying a couple of times.
       unsigned retry_time_s = retry < 5 ? 5 : 30;
-      Serial.printf(" retrying in %u seconds\n", retry_time_s);
       // Wait n seconds before retrying
       delay(retry_time_s * 1000);
       retry++;
@@ -181,16 +167,6 @@ void reconnect() {
 
 unsigned successful = 0;
 unsigned failed = 0;
-unsigned passed_loops = 0;
-void led_flicker(const unsigned loops) {
-  if ((++passed_loops % loops) == 0) {
-    setLed(true);
-  }
-  if ((passed_loops % loops) == 500) {
-    setLed(false);
-  }
-}
-
 unsigned publish_time = 0;
 
 void loop() {
@@ -199,7 +175,7 @@ void loop() {
   }
   client.loop();
 
-  if (p1meter.available()) {
+  if (Serial.available()) {
     p1reader.loop();
   }
 
@@ -207,7 +183,6 @@ void loop() {
     auto start_time = millis();
     publish(heap_before_topic, ESP.getFreeHeap());
     setLed(true);
-    Serial.println("Data available");
     P1Data data;
     String err;
     if (p1reader.parse(&data, &err)) {
@@ -215,13 +190,8 @@ void loop() {
       data.applyEach(Printer());
     } else {
       failed += 1;
-      Serial.println(err);
       client.publish(error_topic, err.c_str());
     }
-    Serial.print("Successful: ");
-    Serial.print(successful);
-    Serial.print(" failed: ");
-    Serial.println(failed);
     publish(success_topic, successful);
     publish(failure_topic, failed);
     publish(heap_after_topic, ESP.getFreeHeap());
@@ -233,7 +203,5 @@ void loop() {
     }
     publish_time = millis();
   }
-
-  //led_flicker(100000);
 }
 
