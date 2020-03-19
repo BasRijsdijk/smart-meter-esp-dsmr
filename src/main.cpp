@@ -6,7 +6,7 @@
 
 #include <dsmr.h>
 
-// Remove all traces of secrets before publishing to github!
+// Move secrets file from include/secrets-example.h to include/secrets.h.
 #include "secrets.h"
 
 using P1Data = ParsedData<
@@ -114,7 +114,7 @@ void setup(){
   setLed(true);
   // Using default serial for reception
   Serial.begin(115200, SERIAL_8N1, SERIAL_RX_ONLY, 1, true);
-  WiFi.begin(ssid, pass);
+  WiFi.begin(wifi_ssid, wifi_pass);
   while (WiFi.status() != WL_CONNECTED)
   {
     delay(500);
@@ -152,7 +152,7 @@ void reconnect() {
 
   while (!client.connected()) {
     // Attempt to connect
-    if (client.connect(client_id, username, password)) {
+    if (client.connect(client_id, mqtt_username, mqtt_password)) {
       reconnects++;
       publish(reconnect_topic, reconnects);
     } else {
